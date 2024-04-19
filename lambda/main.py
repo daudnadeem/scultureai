@@ -1,10 +1,13 @@
 from datetime import datetime
+import os
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from aws_lambda_powertools import Logger
 from mangum import Mangum
 import boto3
 from boto3.dynamodb.conditions import Key
+from aws_lambda_powertools.utilities.data_classes import APIGatewayProxyEvent
+from botocore.exceptions import ClientError
 
 app = FastAPI()
 
@@ -22,9 +25,22 @@ dynamodb = boto3.resource("dynamodb")
 table_name = "test_text_table"
 table = dynamodb.Table(table_name)
 
-@app.get("/")
-def read_root():
-    return {"message": "Hello from FastAPI!"}
+cognito_client = boto3.client("cognito-idp")
+def validate_user_id(event: APIGatewayProxyEvent):
+    user_id = event.path_parameters.get("user_id")
+    if user_id is None or not user_exists_in_cognito(user_id):
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+def user_exists_in_cognito(user_id: str) -> bool:
+    try:
+        response = cognito_client.list_users(
+            UserPoolId=os.genviron.get("COGNITO_USER_POOL_ID")
+        )
+        user_ids = [user["Username"] for user in response["Users"]]
+        return user_id in user_ids
+    except ClientError as e:
+        logger.exception("Error checking user existence in Cognito")
+        return False
 
 @app.post("/user/{user_id}/save")
 def save_text(user_id: str, text: str):

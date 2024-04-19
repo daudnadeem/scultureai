@@ -10,7 +10,6 @@ class FastAPIWithCognitoStack(core.Stack):
     def __init__(self, scope: core.Construct, id: str, **kwargs) -> None:
         super().__init__(scope, id, **kwargs)
 
-        # Create Cognito User Pool
         user_pool = UserPool(self, "UserPool",
             self_sign_up_enabled=True,
             removal_policy=core.RemovalPolicy.DESTROY,
